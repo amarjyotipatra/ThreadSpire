@@ -413,6 +413,7 @@ function RelatedThreadCard() {
       borderRadius: 2, 
       border: `1px solid ${theme.palette.divider}` 
     }}>
+      {/* Already using Avatar here, ensure sx prop is used for sizing if needed */}
       <Avatar sx={{ width: 40, height: 40, mr: 2 }} />
       <Box>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>

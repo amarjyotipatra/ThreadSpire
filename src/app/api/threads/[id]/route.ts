@@ -55,7 +55,7 @@ export async function GET(
       status: 200,
       headers: {
         // Add cache headers to improve performance
-        'Cache-Control': 'public, max-age=60',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120', // Updated cache header
       }
     });
     

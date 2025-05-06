@@ -10,14 +10,21 @@ import { sequelize } from '../lib/db';  // Import sequelize instance
 // Sync all models with the database
 const syncDatabase = async () => {
   try {
-    // Set force to true only in development and when you want to drop tables
-    await User.sync({ alter: process.env.NODE_ENV === 'development' });
-    await Thread.sync({ alter: process.env.NODE_ENV === 'development' });
-    await ThreadSegment.sync({ alter: process.env.NODE_ENV === 'development' });
-    await Reaction.sync({ alter: process.env.NODE_ENV === 'development' });
-    await Bookmark.sync({ alter: process.env.NODE_ENV === 'development' });
-    await Collection.sync({ alter: process.env.NODE_ENV === 'development' });
-    await CollectionItem.sync({ alter: process.env.NODE_ENV === 'development' });
+    // Using safer sync options for MSSQL
+    const syncOptions = { 
+      // Don't use alter: true in MSSQL as it has issues with UNIQUE constraints
+      // Instead, just sync the models without trying to alter existing tables
+      alter: false
+    };
+
+    // If you need to make schema changes, consider using migrations instead
+    await User.sync(syncOptions);
+    await Thread.sync(syncOptions);
+    await ThreadSegment.sync(syncOptions);
+    await Reaction.sync(syncOptions);
+    await Bookmark.sync(syncOptions);
+    await Collection.sync(syncOptions);
+    await CollectionItem.sync(syncOptions);
     
     console.log('Database models synchronized');
   } catch (error) {

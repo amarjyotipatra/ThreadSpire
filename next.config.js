@@ -2,19 +2,41 @@
 const nextConfig = {
   webpack: (
     config,
-    { isServer, webpack } // Add webpack to the destructured arguments to access webpack.IgnorePlugin
+    { isServer, webpack }
   ) => {
-    // Handle node: scheme imports for both client and server
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      // Correct the alias to handle 'node:url' imports
-      'node:url': require.resolve('url'), 
+    // Handle all Node.js built-in modules
+    const nodeLibs = {
+      'node:url': require.resolve('url'),
+      'node:buffer': require.resolve('buffer/'),
+      'node:crypto': require.resolve('crypto-browserify'),
+      'node:stream': require.resolve('stream-browserify'),
+      'node:util': require.resolve('util/'),
+      'node:assert': require.resolve('assert/'),
+      'node:path': require.resolve('path-browserify'),
+      'node:process': require.resolve('process/browser'),
+      'node:events': require.resolve('events/'),
+      'node:os': require.resolve('os-browserify/browser'),
+      // Add other Node.js modules as needed
     };
     
-    // Add IgnorePlugin for pg-hstore as it's not needed for MSSQL
+    // Apply all Node.js module aliases
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      ...nodeLibs,
+    };
+    
+    // Ignore pg-hstore and other unnecessary modules
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /^pg-hstore$/,
+        resourceRegExp: /^(pg-hstore|mariasql|mysql2|tedious|oracledb|sqlite3)$/,
+      })
+    );
+
+    // Provide polyfills for Node.js globals
+    config.plugins.push(
+      new webpack.ProvidePlugin({
+        process: 'process/browser',
+        Buffer: ['buffer', 'Buffer'],
       })
     );
 
@@ -32,8 +54,18 @@ const nextConfig = {
         },
       };
     }
+    
+    // Exclude server-only modules from client bundles
+    if (!isServer) {
+      config.externals = [...(config.externals || []), 'tedious', 'sequelize'];
+    }
+    
     return config;
   },
+  // Add this option to prevent server-only code from being included in client bundles
+  experimental: {
+    serverComponentsExternalPackages: ['tedious', 'sequelize']
+  }
 };
 
 module.exports = nextConfig;

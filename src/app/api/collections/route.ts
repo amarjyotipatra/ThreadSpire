@@ -67,7 +67,12 @@ export async function GET(request: Request) {
       order: [['createdAt', 'DESC']],
     });
     
-    return NextResponse.json(collections, { status: 200 });
+    return NextResponse.json(collections, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      }
+    });
   } catch (error) {
     logServerError(error, 'collections:GET');
     // Note: No AppError check here, as we're not throwing custom AppErrors in the GET handler currently

@@ -3,6 +3,7 @@ import { Thread } from "../../../models";
 import { getCurrentUser } from "../../../lib/auth";
 import SortThreadsDropdown from "@/components/thread/SortThreadsDropdown";
 import { headers } from "next/headers";
+import { Avatar } from "@mui/material"; // Import Avatar
 
 interface ExplorePageProps {
   searchParams: {
@@ -113,7 +114,8 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
                       {segmentText}
                     </p>
                     
-                    {thread.tags?.length > 0 && (
+                    {/* Check if thread.tags is an array and has elements before rendering tags */}
+                    {Array.isArray(thread.tags) && thread.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-4">
                         {thread.tags.slice(0, 3).map((tag: string) => (
                           <span key={tag} className="bg-secondary text-xs px-2 py-1 rounded-full">
@@ -126,13 +128,14 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
                     <div className="flex items-center justify-between text-sm mt-auto">
                       <div className="flex items-center gap-2">
                         {thread.author?.profileImage ? (
-                          <img 
+                          <Avatar 
                             src={thread.author.profileImage}
                             alt={thread.author.name}
-                            className="w-6 h-6 rounded-full"
+                            sx={{ width: 24, height: 24 }} // MUI sx prop for size
                           />
                         ) : (
-                          <span className="bg-secondary rounded-full w-6 h-6" />
+                          // Fallback if no profile image, using MUI Avatar's default
+                          <Avatar sx={{ width: 24, height: 24 }} />
                         )}
                         <span>{thread.author?.name || 'Anonymous'}</span>
                       </div>

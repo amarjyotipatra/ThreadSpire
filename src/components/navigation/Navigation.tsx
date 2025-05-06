@@ -1,6 +1,7 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
+import React from 'react'; 
+import { UserButton, ClerkLoaded, useAuth, SignInButton } from "@clerk/nextjs";
 import { Home, AddBox, Search, FavoriteBorder, Person } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,6 +33,7 @@ const Navigation = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isSignedIn } = useAuth();
   
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -108,8 +110,21 @@ const Navigation = () => {
         </Box>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <UserButton afterSignOutUrl="/" />
-          <Typography variant="body2">Account</Typography>
+          {isSignedIn ? (
+            <>
+              <ClerkLoaded>
+                <UserButton afterSignOutUrl="/" />
+              </ClerkLoaded>
+              <Typography variant="body2">Account</Typography>
+            </>
+          ) : (
+            <SignInButton mode="modal">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
+                <Avatar sx={{ width: 32, height: 32 }} />
+                <Typography variant="body2">Account</Typography>
+              </Box>
+            </SignInButton>
+          )}
         </Box>
       </Box>
     </>
@@ -198,4 +213,4 @@ const Navigation = () => {
   );
 };
 
-export default Navigation;
+export default React.memo(Navigation); // Wrapped Navigation with React.memo

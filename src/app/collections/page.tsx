@@ -1,17 +1,20 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "../../../lib/auth";
 import { Collection } from "../../../models";
 import { PlusIcon } from "lucide-react";
+import { notFound } from "next/navigation";
 
 export default async function CollectionsPage() {
   const user = await getCurrentUser();
   
+  // Add a null check and handle the case where user is null
   if (!user) {
-    redirect("/sign-in");
+    // The middleware should handle the redirect, but just in case
+    // we'll also handle it here with notFound()
+    return notFound();
   }
 
-  // Get all collections for the user
+  // Now TypeScript knows user is not null
   const collections = await Collection.findAll({
     where: { userId: user.id },
     include: [

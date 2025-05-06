@@ -370,9 +370,11 @@ export default function CreateThread() {
             <Box sx={{ flexGrow: 1 }}>
               <EditorContent 
                 editor={editor} 
-                className="prose max-w-none focus:outline-none" 
+                // Updated className for better text area appearance
+                className="prose max-w-none focus:outline-none border rounded-md p-2 min-h-[150px] bg-background text-foreground" 
               />
               
+              {/* Placeholder logic - consider integrating into Tiptap itself if possible */}
               {!editor?.getText() && (
                 <Box 
                   sx={{ 

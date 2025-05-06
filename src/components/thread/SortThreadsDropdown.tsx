@@ -24,7 +24,7 @@ export default function SortThreadsDropdown({ currentSort, currentTag }: SortThr
     
     <select 
       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSortChange(e.target.value)}
-      className="bg-background border rounded-md px-3 py-1.5"
+      className="bg-background border border-input rounded-md px-3 py-2 text-sm text-foreground focus:ring-ring focus:border-ring"
       defaultValue={currentSort}
     >
       <option value="popular">Most Bookmarked</option>

@@ -119,7 +119,12 @@ export async function GET(request: Request) {
     // Execute query
     const threads = await Thread.findAll(query);
     
-    return NextResponse.json(threads, { status: 200 });
+    return NextResponse.json(threads, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      }
+    });
   } catch (error) {
     logServerError(error, 'threads:GET');
     // Note: No AppError check here, as we're not throwing custom AppErrors in the GET handler currently

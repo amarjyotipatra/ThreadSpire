@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "../../../lib/auth";
 import { Bookmark } from "../../../models";
+import { notFound } from "next/navigation";
 
 export default async function BookmarksPage() {
   const user = await getCurrentUser();
   
+  // Add null check for user
   if (!user) {
-    redirect("/sign-in");
+    // The middleware should handle the redirect, but just in case
+    return notFound();
   }
-
+  
   // Get user's bookmarks with related thread data
   const bookmarks = await Bookmark.findAll({
     where: { userId: user.id },
