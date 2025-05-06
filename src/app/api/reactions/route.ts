@@ -3,6 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../../../../lib/auth';
 import { Reaction } from '../../../../models';
 import { ReactionType } from '../../../../models/Reaction';
+import { 
+  AppError, 
+  ErrorType, 
+  formatErrorPayload, 
+  logServerError 
+} from '../../../../lib/errors';
 
 export async function POST(request: Request) {
   try {
@@ -15,61 +21,92 @@ export async function POST(request: Request) {
     
     // Validate required fields
     if (!segmentId) {
-      return NextResponse.json(
-        { error: 'Segment ID is required' },
-        { status: 400 }
+      throw new AppError(
+        'Segment ID is required', 
+        ErrorType.VALIDATION_ERROR, 
+        400
       );
     }
     
-    // Check if user already has a reaction for this segment
-    const existingReaction = await Reaction.findOne({
-      where: {
-        userId: user.id,
-        segmentId,
-      },
-    });
+    // Use a transaction to ensure data consistency
+    const transaction = await Reaction.sequelize?.transaction();
     
-    // If removing reaction (type is null) or changing to a different type
-    if (existingReaction) {
-      if (!type) {
-        // Remove the reaction if type is null
-        await existingReaction.destroy();
-        return NextResponse.json({ success: true, action: 'removed' }, { status: 200 });
-      } else if (Object.values(ReactionType).includes(type as ReactionType)) {
-        // Update the reaction type
-        existingReaction.type = type as ReactionType;
-        await existingReaction.save();
-        return NextResponse.json({ success: true, action: 'updated' }, { status: 200 });
-      } else {
-        return NextResponse.json(
-          { error: 'Invalid reaction type' },
-          { status: 400 }
-        );
-      }
-    }
-    
-    // Create a new reaction if one doesn't exist and type is provided
-    if (type && Object.values(ReactionType).includes(type as ReactionType)) {
-      await Reaction.create({
-        id: uuidv4(),
-        userId: user.id,
-        segmentId,
-        type: type as ReactionType,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    try {
+      // Check if user already has a reaction for this segment with a lock to prevent race conditions
+      const existingReaction = await Reaction.findOne({
+        where: {
+          userId: user.id,
+          segmentId,
+        },
+        lock: true,
+        transaction,
       });
       
-      return NextResponse.json({ success: true, action: 'added' }, { status: 201 });
+      // If removing reaction (type is null) or changing to a different type
+      if (existingReaction) {
+        if (!type) {
+          // Remove the reaction if type is null
+          await existingReaction.destroy({ transaction });
+          await transaction?.commit();
+          return NextResponse.json({ success: true, action: 'removed' }, { status: 200 });
+        } else if (Object.values(ReactionType).includes(type as ReactionType)) {
+          // Update the reaction type
+          existingReaction.type = type as ReactionType;
+          await existingReaction.save({ transaction });
+          await transaction?.commit();
+          return NextResponse.json({ success: true, action: 'updated' }, { status: 200 });
+        } else {
+          await transaction?.rollback();
+          throw new AppError(
+            'Invalid reaction type', 
+            ErrorType.VALIDATION_ERROR, 
+            400
+          );
+        }
+      }
+      
+      // Create a new reaction if one doesn't exist and type is provided
+      if (type && Object.values(ReactionType).includes(type as ReactionType)) {
+        await Reaction.create({
+          id: uuidv4(),
+          userId: user.id,
+          segmentId,
+          type: type as ReactionType,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }, { transaction });
+        
+        await transaction?.commit();
+        return NextResponse.json({ success: true, action: 'added' }, { status: 201 });
+      }
+      
+      await transaction?.rollback();
+      throw new AppError(
+        'Invalid request - type is required for new reactions', 
+        ErrorType.VALIDATION_ERROR, 
+        400
+      );
+    } catch (error) {
+      // Rollback transaction on error
+      await transaction?.rollback();
+      throw error;
+    }
+  } catch (error) {
+    logServerError(error, 'reactions:POST');
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        formatErrorPayload(error),
+        { status: error.code }
+      );
     }
     
     return NextResponse.json(
-      { error: 'Invalid request' },
-      { status: 400 }
-    );
-  } catch (error) {
-    console.error('Error handling reaction:', error);
-    return NextResponse.json(
-      { error: 'Failed to process reaction' },
+      formatErrorPayload(new AppError(
+        'Failed to process reaction', 
+        ErrorType.INTERNAL_SERVER_ERROR, 
+        500
+      )),
       { status: 500 }
     );
   }

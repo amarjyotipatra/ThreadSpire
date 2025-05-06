@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../../../../lib/auth';
 import { Thread, ThreadSegment, sequelize } from '../../../../models';
 import { Op } from 'sequelize';
+import { AppError, ErrorType, formatErrorPayload, logServerError } from '../../../../lib/errors';
 
 export async function POST(request: Request) {
   try {
@@ -15,10 +16,7 @@ export async function POST(request: Request) {
     
     // Validate required fields
     if (!title || !segments || segments.length === 0) {
-      return NextResponse.json(
-        { error: 'Title and at least one segment are required' },
-        { status: 400 }
-      );
+      throw new AppError('Title and at least one segment are required', ErrorType.VALIDATION_ERROR, 400);
     }
     
     // Create thread
@@ -49,9 +47,12 @@ export async function POST(request: Request) {
     
     return NextResponse.json({ id: thread.id }, { status: 201 });
   } catch (error) {
-    console.error('Error creating thread:', error);
+    logServerError(error, 'threads:POST');
+    if (error instanceof AppError) {
+      return NextResponse.json(formatErrorPayload(error), { status: error.code });
+    }
     return NextResponse.json(
-      { error: 'Failed to create thread' },
+      formatErrorPayload(new AppError('Failed to create thread', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }
@@ -120,9 +121,10 @@ export async function GET(request: Request) {
     
     return NextResponse.json(threads, { status: 200 });
   } catch (error) {
-    console.error('Error fetching threads:', error);
+    logServerError(error, 'threads:GET');
+    // Note: No AppError check here, as we're not throwing custom AppErrors in the GET handler currently
     return NextResponse.json(
-      { error: 'Failed to fetch threads' },
+      formatErrorPayload(new AppError('Failed to fetch threads', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../../../../lib/auth';
 import { Bookmark } from '../../../../models';
+import { AppError, ErrorType, formatErrorPayload, logServerError } from '../../../../lib/errors';
 
 export async function POST(request: Request) {
   try {
@@ -14,10 +15,7 @@ export async function POST(request: Request) {
     
     // Validate required fields
     if (!threadId) {
-      return NextResponse.json(
-        { error: 'Thread ID is required' },
-        { status: 400 }
-      );
+      throw new AppError('Thread ID is required', ErrorType.VALIDATION_ERROR, 400);
     }
     
     // Check if user already has bookmarked this thread
@@ -45,9 +43,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, action: 'added' }, { status: 201 });
     }
   } catch (error) {
-    console.error('Error handling bookmark:', error);
+    logServerError(error, 'bookmarks:POST');
+    if (error instanceof AppError) {
+      return NextResponse.json(formatErrorPayload(error), { status: error.code });
+    }
     return NextResponse.json(
-      { error: 'Failed to process bookmark' },
+      formatErrorPayload(new AppError('Failed to process bookmark', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }
@@ -87,9 +88,10 @@ export async function GET(request: Request) {
     
     return NextResponse.json(bookmarks, { status: 200 });
   } catch (error) {
-    console.error('Error fetching bookmarks:', error);
+    logServerError(error, 'bookmarks:GET');
+    // Note: No AppError check here, as we're not throwing custom AppErrors in the GET handler currently
     return NextResponse.json(
-      { error: 'Failed to fetch bookmarks' },
+      formatErrorPayload(new AppError('Failed to fetch bookmarks', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }

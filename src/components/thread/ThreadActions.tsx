@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookmarkIcon, GitForkIcon, Share2Icon, CheckIcon } from "lucide-react";
+import { BookmarkIcon, GitForkIcon, Share2Icon, CheckIcon, AlertCircleIcon } from "lucide-react";
 
 interface ThreadActionsProps {
   threadId: string;
@@ -13,8 +13,13 @@ interface ThreadActionsProps {
 const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps) => {
   const router = useRouter();
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   const handleBookmark = async () => {
     if (!currentUserId) {
@@ -40,13 +45,13 @@ const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps
         throw new Error("Failed to bookmark thread");
       }
 
-      setSuccessMessage("Thread bookmarked successfully");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      showNotification("Thread bookmarked successfully", "success");
       router.refresh();
     } catch (error) {
       console.error("Error bookmarking thread:", error);
       // Revert optimistic update on error
       setIsBookmarked(prev => !prev);
+      showNotification("Failed to bookmark thread. Please try again.", "error");
     }
   };
 
@@ -74,15 +79,13 @@ const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps
       }
 
       const data = await response.json();
-      setSuccessMessage("Thread forked successfully");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      showNotification("Thread forked successfully", "success");
       
       // Redirect to the editor to continue editing the forked thread
       router.push(`/create?threadId=${data.id}`);
     } catch (error) {
       console.error("Error forking thread:", error);
-      setSuccessMessage("Failed to fork thread. Please try again.");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      showNotification("Failed to fork thread. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -101,8 +104,7 @@ const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps
     } else {
       // Fallback for browsers that don't support navigator.share
       navigator.clipboard.writeText(window.location.href);
-      setSuccessMessage("URL copied to clipboard");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      showNotification("URL copied to clipboard", "success");
     }
   };
 
@@ -111,7 +113,7 @@ const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps
       <div className="flex items-center gap-3">
         <button
           onClick={handleBookmark}
-          className={`flex items-center justify-center w-9 h-9 rounded-full ${
+          className={`flex items-center justify-center w-10 h-10 rounded-full ${
             isBookmarked
               ? "bg-primary/20 text-primary"
               : "hover:bg-muted"
@@ -124,7 +126,7 @@ const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps
         <button
           onClick={handleFork}
           disabled={isLoading}
-          className={`flex items-center justify-center w-9 h-9 rounded-full ${
+          className={`flex items-center justify-center w-10 h-10 rounded-full ${
             isLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"
           }`}
           title="Fork this thread"
@@ -134,17 +136,21 @@ const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps
         
         <button
           onClick={handleShare}
-          className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-muted"
+          className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted"
           title="Share this thread"
         >
           <Share2Icon size={18} />
         </button>
       </div>
       
-      {successMessage && (
-        <div className="absolute top-full right-0 mt-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 text-sm py-1 px-3 rounded-md flex items-center gap-2">
-          <CheckIcon size={14} />
-          {successMessage}
+      {notification && (
+        <div className={`notification notification-${notification.type}`}>
+          {notification.type === 'success' ? (
+            <CheckIcon size={18} />
+          ) : (
+            <AlertCircleIcon size={18} />
+          )}
+          <span>{notification.message}</span>
         </div>
       )}
     </div>

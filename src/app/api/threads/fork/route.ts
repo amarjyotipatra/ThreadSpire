@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../../../../../lib/auth';
 import { Thread, ThreadSegment } from '../../../../../models';
+import { AppError, ErrorType, formatErrorPayload, logServerError } from '../../../../../lib/errors';
 
 export async function POST(request: Request) {
   try {
@@ -14,10 +15,7 @@ export async function POST(request: Request) {
     
     // Validate required fields
     if (!threadId) {
-      return NextResponse.json(
-        { error: 'Original Thread ID is required' },
-        { status: 400 }
-      );
+      throw new AppError('Original Thread ID is required', ErrorType.VALIDATION_ERROR, 400);
     }
     
     // Find the original thread with its segments
@@ -33,13 +31,10 @@ export async function POST(request: Request) {
     }) as Thread & { segments?: ThreadSegment[] };
     
     if (!originalThread) {
-      return NextResponse.json(
-        { error: 'Thread not found or not published' },
-        { status: 404 }
-      );
+      throw new AppError('Thread not found or not published', ErrorType.NOT_FOUND_ERROR, 404);
     }
     
-    // Create new thread as a draft (forked/remixed version)
+    // Create a new (draft) thread as a fork
     const newThread = await Thread.create({
       id: uuidv4(),
       userId: user.id,
@@ -73,9 +68,12 @@ export async function POST(request: Request) {
     }, { status: 201 });
     
   } catch (error) {
-    console.error('Error forking thread:', error);
+    logServerError(error, 'threads/fork:POST');
+    if (error instanceof AppError) {
+      return NextResponse.json(formatErrorPayload(error), { status: error.code });
+    }
     return NextResponse.json(
-      { error: 'Failed to fork thread' },
+      formatErrorPayload(new AppError('Failed to fork thread', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }

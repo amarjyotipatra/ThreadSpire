@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../../../../lib/auth';
-import { Collection, CollectionItem } from '../../../../models';
+import { Collection } from '../../../../models';
+import { AppError, ErrorType, formatErrorPayload, logServerError } from '../../../../lib/errors';
 
 // Create a new collection
 export async function POST(request: Request) {
@@ -15,10 +16,7 @@ export async function POST(request: Request) {
     
     // Validate required fields
     if (!name) {
-      return NextResponse.json(
-        { error: 'Collection name is required' },
-        { status: 400 }
-      );
+      throw new AppError('Collection name is required', ErrorType.VALIDATION_ERROR, 400);
     }
     
     // Create collection
@@ -34,9 +32,12 @@ export async function POST(request: Request) {
     
     return NextResponse.json({ id: collection.id }, { status: 201 });
   } catch (error) {
-    console.error('Error creating collection:', error);
+    logServerError(error, 'collections:POST');
+    if (error instanceof AppError) {
+      return NextResponse.json(formatErrorPayload(error), { status: error.code });
+    }
     return NextResponse.json(
-      { error: 'Failed to create collection' },
+      formatErrorPayload(new AppError('Failed to create collection', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }
@@ -68,9 +69,10 @@ export async function GET(request: Request) {
     
     return NextResponse.json(collections, { status: 200 });
   } catch (error) {
-    console.error('Error fetching collections:', error);
+    logServerError(error, 'collections:GET');
+    // Note: No AppError check here, as we're not throwing custom AppErrors in the GET handler currently
     return NextResponse.json(
-      { error: 'Failed to fetch collections' },
+      formatErrorPayload(new AppError('Failed to fetch collections', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }

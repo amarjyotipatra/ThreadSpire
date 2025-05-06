@@ -1,6 +1,6 @@
 import { Sequelize } from 'sequelize';
 
-const isBuildTime = process.env['NEXT_PHASE'] === 'phase-production-build';
+export const isBuildTime = process.env['NEXT_PHASE'] === 'phase-production-build';
 const databaseUrl = process.env.DATABASE_URL;
 
 console.log('Build-time check:', isBuildTime);

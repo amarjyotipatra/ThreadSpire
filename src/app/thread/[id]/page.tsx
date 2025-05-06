@@ -16,18 +16,20 @@ import {
   useTheme,
   useMediaQuery,
   Skeleton,
-  Button
 } from '@mui/material';
 import { 
   ArrowBack, 
-  FavoriteBorder, 
   ChatBubbleOutline, 
   Repeat, 
   IosShare, 
-  Favorite,
   MoreHoriz
 } from '@mui/icons-material';
 import { useUser } from '@clerk/nextjs';
+import ReactionSection from '@/components/thread/ReactionSection';
+import ErrorAlert from '@/components/ui/ErrorAlert';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { ErrorType } from '../../../../lib/errors';
+
 
 interface Reaction {
   id: string;
@@ -65,7 +67,7 @@ interface Thread {
   createdAt: string;
   userId: string;
 }
-
+// Function to format date in Threads-style (2h, 3d ago format)
 // Function to format date in Threads-style (2h, 3d ago format)
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
@@ -93,6 +95,8 @@ const formatTimeAgo = (dateString: string) => {
 export default function ThreadPage() {
   const [thread, setThread] = useState<Thread | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [reactionStates, setReactionStates] = useState<Array<{userReaction: string | null, counts: Record<string, number>}>>([]);
+  const { error, setError, clearError } = useErrorHandler();
   const { id } = useParams() as { id: string };
   const { user, isSignedIn } = useUser();
   const theme = useTheme();
@@ -102,54 +106,106 @@ export default function ThreadPage() {
   useEffect(() => {
     const fetchThreadData = async () => {
       try {
-        // In a real app, this would be an API call to get the thread data
-        const response = await fetch(`/api/threads/${id}`);
+        setIsLoading(true);
+        clearError();
+        
+        // Clean the ID by removing any trailing characters like ":1"
+        const cleanId = id.split(':')[0];
+        
+        // Use the clean ID when making the API request
+        const response = await fetch(`/api/threads/${cleanId}`, {
+          cache: 'no-store', // Ensure we get fresh data
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch thread');
+          if (response.status === 404) {
+            throw new Error('Thread not found', { cause: ErrorType.NOT_FOUND_ERROR });
+          }
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || `Failed to fetch thread: ${response.status}`, {
+            cause: errorData.error?.type || ErrorType.NETWORK_ERROR
+          });
         }
         
         const data = await response.json();
         setThread(data);
+        
+        // Initialize reaction states
+        const initialReactionStates = data.segments.map((segment: Segment) => {
+          const counts: Record<string, number> = {};
+          segment.reactions.forEach((reaction: Reaction) => {
+            counts[reaction.type] = (counts[reaction.type] || 0) + 1;
+          });
+          
+          const userReaction = user 
+            ? segment.reactions.find((r: Reaction) => r.userId === user.id)?.type || null 
+            : null;
+            
+          return { userReaction, counts };
+        });
+        
+        setReactionStates(initialReactionStates);
       } catch (error) {
         console.error('Error fetching thread:', error);
-        // Would implement a proper error state UI in a real app
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load thread. Please try again later.';
+        const errorType = error instanceof Error && error.cause ? error.cause as ErrorType : ErrorType.UNKNOWN_ERROR;
+        setError(errorMessage, errorType as ErrorType | undefined);
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchThreadData();
-  }, [id]);
+  }, [id, user, setError, clearError]);
   
   if (isLoading) {
     return <ThreadDetailSkeleton isMobile={isMobile} />;
+  }
+  
+  if (error && !thread) {
+    return (
+      <Container maxWidth={isMobile ? 'sm' : 'md'} sx={{ pt: isMobile ? 7 : 4, pb: isMobile ? 8 : 4 }}>
+        <Box sx={{ py: 4 }}>
+          <ErrorAlert 
+            message={error.message} 
+            type={error.type}
+            onClose={clearError}
+            autoHideDuration={null}
+          />
+          <Box sx={{ textAlign: 'center', mt: 3 }}>
+            <Link href="/" style={{ color: theme.palette.primary.main }}>
+              Return to home
+            </Link>
+          </Box>
+        </Box>
+      </Container>
+    );
   }
   
   if (!thread) {
     return notFound();
   }
   
-  // Count reactions per segment
-  const reactionCounts = thread.segments.map((segment) => {
-    const counts: Record<string, number> = {};
-    segment.reactions.forEach((reaction) => {
-      counts[reaction.type] = (counts[reaction.type] || 0) + 1;
-    });
-    return counts;
-  });
-
-  // Check if current user has reacted to each segment
-  const userReactions = user
-    ? thread.segments.map((segment) => 
-        segment.reactions.find((r) => r.userId === user.id)?.type || null
-      )
-    : [];
-  
   const containerMaxWidth = isMobile ? 'sm' : 'md';
   const contentPadding = isMobile ? { px: 2, py: 2 } : { px: 3, py: 3 };
   
   return (
     <Container maxWidth={containerMaxWidth} sx={{ pt: isMobile ? 7 : 4, pb: isMobile ? 8 : 4 }}>
+      {/* Display any non-fatal errors */}
+      {error && (
+        <Box sx={{ mb: 2 }}>
+          <ErrorAlert
+            message={error.message}
+            type={error.type}
+            onClose={clearError}
+            severity="warning"
+          />
+        </Box>
+      )}
+      
       {/* Mobile header with back button */}
       {isMobile && (
         <Box sx={{ 
@@ -233,38 +289,48 @@ export default function ThreadPage() {
       <Divider />
       
       {/* Thread segments */}
-      {thread.segments.map((segment, index) => (
-        <Box key={segment.id} sx={{ ...contentPadding, borderBottom: `1px solid ${theme.palette.divider}` }}>
-          <Box 
-            sx={{ mb: 3 }}
-            dangerouslySetInnerHTML={{ __html: segment.content }}
-          />
-          
-          {/* Reaction buttons */}
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton 
-              size={isMobile ? "small" : "medium"}
-              color={userReactions[index] === '❤️' ? "secondary" : "default"}
-            >
-              {userReactions[index] === '❤️' ? <Favorite color="secondary" /> : <FavoriteBorder />}
-            </IconButton>
-            <IconButton size={isMobile ? "small" : "medium"}>
-              <ChatBubbleOutline />
-            </IconButton>
-            <IconButton size={isMobile ? "small" : "medium"}>
-              <Repeat />
-            </IconButton>
-            <IconButton size={isMobile ? "small" : "medium"}>
-              <IosShare />
-            </IconButton>
+      {thread.segments.map((segment, index) => {
+        const reactionState = reactionStates[index] || { userReaction: null, counts: {} };
+        const totalLikes = Object.values(reactionState.counts).reduce((a, b) => a + b, 0);
+        
+        return (
+          <Box key={segment.id} sx={{ ...contentPadding, borderBottom: `1px solid ${theme.palette.divider}` }}>
+            <Box 
+              sx={{ mb: 3 }}
+              dangerouslySetInnerHTML={{ __html: segment.content }}
+            />
+            
+            {/* Replace the basic reaction buttons with ReactionSection component */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <ReactionSection
+                  segmentId={segment.id}
+                  reactionCounts={reactionState.counts}
+                  userReaction={reactionState.userReaction}
+                  isAuthenticated={!!isSignedIn}
+                />
+              
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton size={isMobile ? "small" : "medium"}>
+                  <ChatBubbleOutline />
+                </IconButton>
+                <IconButton size={isMobile ? "small" : "medium"}>
+                  <Repeat />
+                </IconButton>
+                <IconButton size={isMobile ? "small" : "medium"}>
+                  <IosShare />
+                </IconButton>
+              </Box>
+            </Box>
+            
+            {/* Reaction stats */}
+            {totalLikes > 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {totalLikes} {totalLikes === 1 ? 'reaction' : 'reactions'}
+              </Typography>
+            )}
           </Box>
-          
-          {/* Reaction stats */}
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {Object.values(reactionCounts[index] || {}).reduce((a, b) => a + b, 0) || 0} likes
-          </Typography>
-        </Box>
-      ))}
+        );
+      })}
       
       {/* Related threads section */}
       <Box sx={{ ...contentPadding, mt: 4 }}>

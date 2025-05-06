@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth } from '../../../../../lib/auth';
 import { Collection, CollectionItem } from '../../../../../models';
+import { AppError, ErrorType, formatErrorPayload, logServerError } from '../../../../../lib/errors';
 
 export async function POST(request: Request) {
   try {
@@ -14,10 +15,7 @@ export async function POST(request: Request) {
     
     // Validate required fields
     if (!collectionId || !threadId) {
-      return NextResponse.json(
-        { error: 'Collection ID and Thread ID are required' },
-        { status: 400 }
-      );
+      throw new AppError('Collection ID and Thread ID are required', ErrorType.VALIDATION_ERROR, 400);
     }
     
     // Verify the collection belongs to the user
@@ -29,10 +27,7 @@ export async function POST(request: Request) {
     });
     
     if (!collection) {
-      return NextResponse.json(
-        { error: 'Collection not found or access denied' },
-        { status: 404 }
-      );
+      throw new AppError('Collection not found or access denied', ErrorType.NOT_FOUND_ERROR, 404);
     }
     
     // Check if thread is already in the collection
@@ -44,10 +39,7 @@ export async function POST(request: Request) {
     });
     
     if (existingItem) {
-      return NextResponse.json(
-        { error: 'Thread already exists in this collection' },
-        { status: 400 }
-      );
+      throw new AppError('Thread already exists in this collection', ErrorType.VALIDATION_ERROR, 400);
     }
     
     // Add thread to collection
@@ -62,9 +54,12 @@ export async function POST(request: Request) {
     
     return NextResponse.json({ id: collectionItem.id }, { status: 201 });
   } catch (error) {
-    console.error('Error adding thread to collection:', error);
+    logServerError(error, 'collections/items:POST');
+    if (error instanceof AppError) {
+      return NextResponse.json(formatErrorPayload(error), { status: error.code });
+    }
     return NextResponse.json(
-      { error: 'Failed to add thread to collection' },
+      formatErrorPayload(new AppError('Failed to add thread to collection', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }
@@ -82,10 +77,7 @@ export async function DELETE(request: Request) {
     const itemId = searchParams.get('itemId');
     
     if ((!collectionId || !threadId) && !itemId) {
-      return NextResponse.json(
-        { error: 'Either Collection ID and Thread ID, or Item ID are required' },
-        { status: 400 }
-      );
+      throw new AppError('Either Collection ID and Thread ID, or Item ID are required', ErrorType.VALIDATION_ERROR, 400);
     }
     
     // Verify the collection belongs to the user
@@ -98,10 +90,7 @@ export async function DELETE(request: Request) {
       });
       
       if (!collection) {
-        return NextResponse.json(
-          { error: 'Collection not found or access denied' },
-          { status: 404 }
-        );
+        throw new AppError('Collection not found or access denied', ErrorType.NOT_FOUND_ERROR, 404);
       }
     }
     
@@ -114,26 +103,23 @@ export async function DELETE(request: Request) {
       where.collectionId = collectionId;
       where.threadId = threadId;
     } else {
-      return NextResponse.json(
-        { error: 'Invalid parameters for deletion' },
-        { status: 400 }
-      );
+      throw new AppError('Invalid parameters for deletion', ErrorType.VALIDATION_ERROR, 400);
     }
       
     const deleteResult = await CollectionItem.destroy({ where });
     
     if (deleteResult === 0) {
-      return NextResponse.json(
-        { error: 'Thread not found in collection' },
-        { status: 404 }
-      );
+      throw new AppError('Thread not found in collection', ErrorType.NOT_FOUND_ERROR, 404);
     }
     
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error('Error removing thread from collection:', error);
+    logServerError(error, 'collections/items:DELETE');
+    if (error instanceof AppError) {
+      return NextResponse.json(formatErrorPayload(error), { status: error.code });
+    }
     return NextResponse.json(
-      { error: 'Failed to remove thread from collection' },
+      formatErrorPayload(new AppError('Failed to remove thread from collection', ErrorType.INTERNAL_SERVER_ERROR, 500)),
       { status: 500 }
     );
   }
