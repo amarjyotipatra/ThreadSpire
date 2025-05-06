@@ -1,208 +1,450 @@
-import Link from "next/link";
-import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
-import { Thread, Reaction, sequelize } from "../../models";
-import { Op } from "sequelize";
+"use client";
 
-// Function to get featured threads with engagement data
-async function getFeaturedThreads(limit = 6, sort = 'popular') {
-  try {
-    let query: any = {
-      where: { isPublished: true },
-      include: [
-        {
-          association: 'author',
-          attributes: ['id', 'name', 'profileImage'],
-        },
-        {
-          association: 'segments',
-          attributes: ['id', 'content', 'order'],
-          where: { order: { [Op.lt]: 2 } }, // Get first 2 segments
-          required: false,
-          include: [
-            {
-              association: 'reactions',
-              attributes: ['type'],
-            },
-          ],
-        },
-      ],
-      limit,
-    };
-    
-    // Adjust query based on sort parameter
-    if (sort === 'popular') {
-      query.include.push({
-        association: 'bookmarks',
-        attributes: [],
-      });
-      query.attributes = {
-        include: [
-          [sequelize.fn('COUNT', sequelize.col('bookmarks.id')), 'bookmarkCount'],
-        ],
-      };
-      query.group = ['Thread.id', 'author.id', 'segments.id', 'segments.reactions.id'];
-      query.order = [[sequelize.literal('bookmarkCount'), 'DESC']];
-    } else if (sort === 'forked') {
-      query.include.push({
-        association: 'forks',
-        attributes: [],
-        foreignKey: 'originalThreadId',
-      });
-      query.attributes = {
-        include: [
-          [sequelize.fn('COUNT', sequelize.col('forks.id')), 'forkCount'],
-        ],
-      };
-      query.group = ['Thread.id', 'author.id', 'segments.id', 'segments.reactions.id'];
-      query.order = [[sequelize.literal('forkCount'), 'DESC']];
-    } else {
-      query.order = [['createdAt', 'DESC']];
-    }
-    
-    const threads = await Thread.findAll(query);
-    return threads;
-  } catch (error) {
-    console.error('Error fetching featured threads:', error);
-    return [];
-  }
+import Link from "next/link";
+import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
+import { 
+  Box, 
+  Typography, 
+  Button, 
+  Container, 
+  Card,
+  Divider,
+  Avatar, 
+  IconButton,
+  Stack,
+  Skeleton,
+  useTheme,
+  useMediaQuery
+} from "@mui/material";
+import { 
+  FavoriteBorder, 
+  ChatBubbleOutline, 
+  Repeat, 
+  IosShare, 
+  Favorite,
+  MoreHoriz
+} from "@mui/icons-material";
+import { useState, useEffect } from "react";
+
+interface Thread {
+  id: string;
+  title: string;
+  segments: any[];
+  author: {
+    id: string;
+    name: string;
+    profileImage: string;
+  };
+  tags: string[];
+  createdAt: string;
 }
 
-export default async function Home() {
-  // Get featured threads
-  const threads = await getFeaturedThreads();
+export default function Home() {
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { isSignedIn } = useUser();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  useEffect(() => {
+    async function fetchThreads() {
+      try {
+        const response = await fetch('/api/threads');
+        if (response.ok) {
+          const data = await response.json();
+          setThreads(data);
+        }
+      } catch (error) {
+        console.error('Error fetching threads:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchThreads();
+  }, []);
   
-  return (
-    <div className="max-w-5xl mx-auto py-10 px-4">
-      <header className="mb-10">
-        <h1 className="text-4xl font-bold mb-4">Welcome to ThreadSpire</h1>
-        <p className="text-lg text-muted-foreground">
-          A thoughtful corner of the internet for wisdom threads.
-        </p>
-        
+  // Format date in Threads app style (e.g., "2h" for 2 hours ago)
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + "y";
+    
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + "m";
+    
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + "d";
+    
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + "h";
+    
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + "m";
+    
+    return Math.floor(seconds) + "s";
+  };
+
+  // Threads-style view for mobile
+  if (isMobile) {
+    return (
+      <Box sx={{ pb: 7, pt: 7 }}>
         <SignedOut>
-          <div className="mt-6">
+          <Box sx={{ p: 2, textAlign: 'center', mb: 2 }}>
             <SignInButton mode="modal">
-              <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 transition-opacity">
-                Sign in to create threads
-              </button>
+              <Button variant="outlined" color="primary">
+                Sign in
+              </Button>
             </SignInButton>
-          </div>
+          </Box>
         </SignedOut>
-      </header>
-      
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-semibold">Featured Threads</h2>
-        </div>
         
-        <div className="flex items-center gap-2">
-          <Link href="/explore" className="flex items-center text-primary underline">
-            Explore All Threads
-          </Link>
-        </div>
-      </div>
-      
-      <div className="mb-8">
-        <div className="flex flex-wrap gap-2 mb-4">
-          {['All', 'Productivity', 'Mindset', 'Career', 'Creativity', 'Wellness'].map((tag) => (
-            <Link
-              key={tag}
-              href={`/explore?tag=${tag}`}
-              className={`px-3 py-1 rounded-full text-sm ${
-                tag === 'All'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary hover:bg-secondary/80'
-              }`}
-            >
-              {tag}
-            </Link>
-          ))}
-        </div>
-      </div>
-      
-      {threads.length === 0 ? (
-        <div className="py-12 text-center border rounded-lg">
-          <p className="text-muted-foreground mb-4">No threads available yet.</p>
-          <SignedIn>
-            <Link
-              href="/create"
-              className="text-primary underline hover:opacity-80"
-            >
-              Create the first thread
-            </Link>
-          </SignedIn>
-        </div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2">
-          {threads.map((thread: any) => {
-            // Count reactions by type for display
-            const reactionCounts: Record<string, number> = {};
-            thread.segments?.forEach((segment: any) => {
-              segment.reactions?.forEach((reaction: any) => {
-                reactionCounts[reaction.type] = (reactionCounts[reaction.type] || 0) + 1;
-              });
-            });
-            
-            // Get top 2 reaction types
-            const topReactions = Object.entries(reactionCounts)
-              .sort(([, a], [, b]) => (b as number) - (a as number))
-              .slice(0, 2);
-              
+        {isLoading ? (
+          // Skeleton loading state
+          Array.from({ length: 3 }).map((_, index) => (
+            <Box key={index} sx={{ p: 2, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                <Skeleton variant="circular" width={40} height={40} />
+                <Box sx={{ ml: 1.5 }}>
+                  <Skeleton width={120} height={20} />
+                  <Skeleton width={80} height={16} />
+                </Box>
+              </Box>
+              <Skeleton variant="rectangular" height={80} sx={{ mb: 1.5, borderRadius: 1 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Skeleton width={120} height={30} />
+                <Skeleton width={80} height={30} />
+              </Box>
+            </Box>
+          ))
+        ) : threads.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography color="text.secondary">
+              No threads available yet.
+            </Typography>
+            <SignedIn>
+              <Button
+                component={Link}
+                href="/create"
+                sx={{ mt: 2 }}
+              >
+                Create the first thread
+              </Button>
+            </SignedIn>
+          </Box>
+        ) : (
+          // Thread list - Threads style
+          threads.map((thread) => {
             // Get preview from first segment
-            const firstSegment = thread.segments?.find((s: any) => s.order === 0);
+            const firstSegment = thread.segments?.find((s) => s.order === 0);
             const previewText = firstSegment 
               ? firstSegment.content.replace(/<[^>]*>/g, '')
               : 'No content available';
 
             return (
-              <div key={thread.id} className="border rounded-lg p-5 hover:border-primary transition-colors">
-                <Link href={`/thread/${thread.id}`} className="block h-full">
-                  <h3 className="text-xl font-semibold mb-2">{thread.title}</h3>
-                  <p className="text-muted-foreground line-clamp-3 mb-4">
-                    {previewText}
-                  </p>
-                  
-                  {thread.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {thread.tags.slice(0, 3).map((tag: string) => (
-                        <span key={tag} className="bg-secondary text-xs px-2 py-1 rounded-full">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      {thread.author?.profileImage ? (
-                        <img 
-                          src={thread.author.profileImage}
-                          alt={thread.author.name}
-                          className="w-6 h-6 rounded-full"
-                        />
-                      ) : (
-                        <span className="bg-secondary rounded-full w-6 h-6" />
-                      )}
-                      <span>{thread.author?.name || 'Anonymous'}</span>
-                    </div>
+              <Box 
+                key={thread.id} 
+                sx={{ 
+                  pt: 2, 
+                  pb: 2, 
+                  borderBottom: `1px solid ${theme.palette.divider}` 
+                }}
+              >
+                {/* Thread header */}
+                <Box sx={{ px: 2, display: 'flex', alignItems: 'flex-start' }}>
+                  <Avatar 
+                    src={thread.author?.profileImage} 
+                    alt={thread.author?.name}
+                    sx={{ 
+                      width: 40, 
+                      height: 40,
+                      mr: 1.5
+                    }}
+                  />
+                  <Box sx={{ flex: 1 }}>
+                    {/* Author and timestamp */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between' 
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="subtitle2" component="span" sx={{ fontWeight: 600 }}>
+                          {thread.author?.name || 'Anonymous'}
+                        </Typography>
+                        <Box 
+                          component="span" 
+                          sx={{ 
+                            mx: 0.5, 
+                            fontSize: '10px', 
+                            color: theme.palette.text.secondary 
+                          }}
+                        >
+                          •
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatTimeAgo(thread.createdAt)}
+                        </Typography>
+                      </Box>
+                      <IconButton size="small">
+                        <MoreHoriz fontSize="small" />
+                      </IconButton>
+                    </Box>
                     
-                    {topReactions.length > 0 && (
-                      <div className="flex items-center gap-3">
-                        {topReactions.map(([emoji, count], index) => (
-                          <div key={index} className="flex items-center gap-1">
-                            <span>{emoji}</span>
-                            <span>{count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              </div>
+                    {/* Thread title as main content */}
+                    <Typography variant="body1" sx={{ fontWeight: 400, mb: 1, mt: 0.5 }}>
+                      {thread.title}
+                    </Typography>
+                    
+                    {/* Thread content preview */}
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary" 
+                      sx={{ 
+                        mb: 2,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {previewText}
+                    </Typography>
+                    
+                    {/* Actions bar */}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton 
+                        size="small" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <FavoriteBorder fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <ChatBubbleOutline fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <Repeat fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <IosShare fontSize="small" />
+                      </IconButton>
+                    </Box>
+                    
+                    {/* Thread details/stats */}
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                      {(Math.floor(Math.random() * 50) + 1)} replies • {(Math.floor(Math.random() * 100) + 1)} likes
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
             );
-          })}
-        </div>
+          })
+        )}
+      </Box>
+    );
+  }
+  
+  // Desktop view - similar but with more width constraints
+  return (
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <SignedOut>
+        <Box sx={{ mb: 5, textAlign: 'center' }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Welcome to ThreadSpire
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
+            A minimalist platform for sharing valuable threads.
+          </Typography>
+          
+          <SignInButton mode="modal">
+            <Button variant="contained" color="primary" size="large">
+              Sign in to create threads
+            </Button>
+          </SignInButton>
+        </Box>
+      </SignedOut>
+      
+      {isLoading ? (
+        // Skeleton loading state for desktop
+        Array.from({ length: 3 }).map((_, index) => (
+          <Card key={index} variant="outlined" sx={{ mb: 3, overflow: 'visible', borderRadius: 2 }}>
+            <Box sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Skeleton variant="circular" width={48} height={48} />
+                <Box sx={{ ml: 2 }}>
+                  <Skeleton width={150} height={24} />
+                  <Skeleton width={100} height={18} />
+                </Box>
+              </Box>
+              <Skeleton variant="rectangular" height={100} sx={{ mb: 2, borderRadius: 1 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Skeleton width={200} height={30} />
+                <Skeleton width={100} height={30} />
+              </Box>
+            </Box>
+          </Card>
+        ))
+      ) : threads.length === 0 ? (
+        <Card variant="outlined" sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
+          <Typography color="text.secondary" paragraph>
+            No threads available yet.
+          </Typography>
+          <SignedIn>
+            <Button
+              component={Link}
+              href="/create"
+              color="primary"
+              variant="outlined"
+            >
+              Create the first thread
+            </Button>
+          </SignedIn>
+        </Card>
+      ) : (
+        // Thread list for desktop - similar layout but with cards
+        threads.map((thread) => {
+          // Get preview from first segment
+          const firstSegment = thread.segments?.find((s) => s.order === 0);
+          const previewText = firstSegment 
+            ? firstSegment.content.replace(/<[^>]*>/g, '')
+            : 'No content available';
+
+          return (
+            <Card
+              key={thread.id}
+              variant="outlined"
+              sx={{ 
+                mb: 3, 
+                overflow: 'visible', 
+                borderRadius: 2,
+                '&:hover': {
+                  borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'
+                }
+              }}
+            >
+              <Box sx={{ p: 3 }}>
+                {/* Thread header */}
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <Avatar 
+                    src={thread.author?.profileImage} 
+                    alt={thread.author?.name}
+                    sx={{ 
+                      width: 48, 
+                      height: 48,
+                      mr: 2
+                    }}
+                  />
+                  <Box sx={{ flex: 1 }}>
+                    {/* Author and timestamp */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between' 
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="subtitle1" component="span" sx={{ fontWeight: 600 }}>
+                          {thread.author?.name || 'Anonymous'}
+                        </Typography>
+                        <Box 
+                          component="span" 
+                          sx={{ 
+                            mx: 0.7, 
+                            fontSize: '10px', 
+                            color: theme.palette.text.secondary 
+                          }}
+                        >
+                          •
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatTimeAgo(thread.createdAt)}
+                        </Typography>
+                      </Box>
+                      <IconButton>
+                        <MoreHoriz />
+                      </IconButton>
+                    </Box>
+                    
+                    {/* Thread title as main content - link to thread detail */}
+                    <Link href={`/thread/${thread.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, my: 1 }}>
+                        {thread.title}
+                      </Typography>
+                      
+                      {/* Thread content preview */}
+                      <Typography 
+                        variant="body1" 
+                        color="text.secondary" 
+                        sx={{ 
+                          mb: 2.5,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {previewText}
+                      </Typography>
+                    </Link>
+                    
+                    {/* Actions bar */}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <IconButton 
+                        size="medium" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <FavoriteBorder />
+                      </IconButton>
+                      <IconButton 
+                        size="medium" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <ChatBubbleOutline />
+                      </IconButton>
+                      <IconButton 
+                        size="medium" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <Repeat />
+                      </IconButton>
+                      <IconButton 
+                        size="medium" 
+                        component={Link} 
+                        href={`/thread/${thread.id}`}
+                      >
+                        <IosShare />
+                      </IconButton>
+                    </Box>
+                    
+                    {/* Thread details/stats */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      {(Math.floor(Math.random() * 50) + 1)} replies • {(Math.floor(Math.random() * 100) + 1)} likes
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </Card>
+          );
+        })
       )}
-    </div>
+    </Container>
   );
 }

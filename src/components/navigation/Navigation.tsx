@@ -1,76 +1,200 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { HomeIcon, PlusSquare, BookmarkIcon, LineChart, SectionIcon } from "lucide-react";
+import { Home, AddBox, Search, FavoriteBorder, Person } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { 
+  BottomNavigation,
+  BottomNavigationAction,
+  Paper,
+  Box,
+  AppBar,
+  Toolbar,
+  Typography,
+  IconButton,
+  Avatar,
+  useMediaQuery,
+  useTheme,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Divider
+} from "@mui/material";
 import { ThemeToggle } from "../ui/ThemeToggle";
+import { useState } from "react";
 
 const Navigation = () => {
   const pathname = usePathname();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [mobileOpen, setMobileOpen] = useState(false);
+  
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
   
   const navItems = [
     {
       label: "Home",
       href: "/",
-      icon: HomeIcon,
+      icon: Home,
+    },
+    {
+      label: "Search",
+      href: "/explore",
+      icon: Search,
     },
     {
       label: "Create",
       href: "/create",
-      icon: PlusSquare,
+      icon: AddBox,
     },
     {
       label: "Bookmarks",
       href: "/bookmarks",
-      icon: BookmarkIcon,
+      icon: FavoriteBorder,
     },
     {
-      label: "Collections",
+      label: "Profile",
       href: "/collections",
-      icon: SectionIcon,
-    },
-    {
-      label: "Analytics",
-      href: "/analytics",
-      icon: LineChart,
+      icon: Person,
     },
   ];
+
+  // Find active nav item index for bottom navigation
+  const activeNavIndex = navItems.findIndex(item => item.href === pathname) !== -1 
+    ? navItems.findIndex(item => item.href === pathname) 
+    : 0;
   
-  return (
-    <div className="w-64 border-r h-screen flex flex-col p-4">
-      <div className="flex items-center gap-2 px-2 mb-8">
-        <div className="text-2xl font-bold">ThreadSpire</div>
-      </div>
+  const drawer = (
+    <>
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+          ThreadSpire
+        </Typography>
+      </Box>
       
-      <nav className="space-y-2 flex-1">
+      <List sx={{ flexGrow: 1 }}>
         {navItems.map((item) => {
           const isActive = pathname === item.href;
+          const IconComponent = item.icon;
+          
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-4 px-3 py-2 rounded-lg transition-colors ${
-                isActive 
-                  ? "bg-primary text-primary-foreground" 
-                  : "hover:bg-muted"
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </Link>
+            <ListItem key={item.href} disablePadding>
+              <ListItemButton 
+                component={Link} 
+                href={item.href}
+                selected={isActive}
+              >
+                <ListItemIcon>
+                  <IconComponent />
+                </ListItemIcon>
+                <ListItemText primary={item.label} />
+              </ListItemButton>
+            </ListItem>
           );
         })}
-      </nav>
+      </List>
       
-      <div className="mt-auto border-t pt-4 flex flex-col gap-4">
-        <ThemeToggle />
-        <div className="flex items-center gap-4 px-2">
+      <Divider />
+      
+      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <ThemeToggle />
+        </Box>
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <UserButton afterSignOutUrl="/" />
-          <span className="text-sm">Account</span>
-        </div>
-      </div>
-    </div>
+          <Typography variant="body2">Account</Typography>
+        </Box>
+      </Box>
+    </>
+  );
+
+  if (isMobile) {
+    // Mobile view with bottom navigation and top app bar
+    return (
+      <>
+        <AppBar position="fixed" color="default" elevation={0} sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+          <Toolbar>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+              ThreadSpire
+            </Typography>
+            <ThemeToggle />
+          </Toolbar>
+        </AppBar>
+        
+        <Box 
+          component="nav" 
+          sx={{ 
+            width: { sm: 240 }, 
+            flexShrink: { sm: 0 } 
+          }}
+        >
+          <Drawer
+            variant="temporary"
+            open={mobileOpen}
+            onClose={handleDrawerToggle}
+            ModalProps={{ keepMounted: true }}
+            sx={{
+              '& .MuiDrawer-paper': { 
+                width: 240,
+                boxSizing: 'border-box' 
+              },
+            }}
+          >
+            {drawer}
+          </Drawer>
+        </Box>
+        
+        <Paper 
+          sx={{ 
+            position: 'fixed', 
+            bottom: 0, 
+            left: 0, 
+            right: 0, 
+            zIndex: theme.zIndex.appBar 
+          }} 
+          elevation={3}
+        >
+          <BottomNavigation
+            showLabels={false}
+            value={activeNavIndex}
+          >
+            {navItems.map((item) => (
+              <BottomNavigationAction 
+                key={item.href}
+                component={Link} 
+                href={item.href}
+                icon={<item.icon />} 
+              />
+            ))}
+          </BottomNavigation>
+        </Paper>
+      </>
+    );
+  }
+
+  // Tablet/Desktop view with side navigation
+  return (
+    <Drawer
+      variant="permanent"
+      sx={{
+        display: { xs: 'none', sm: 'block' },
+        width: 240,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: 240,
+          boxSizing: 'border-box',
+        },
+      }}
+    >
+      {drawer}
+    </Drawer>
   );
 };
 

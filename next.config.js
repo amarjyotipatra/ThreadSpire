@@ -1,7 +1,5 @@
-import type { NextConfig } from 'next';
-import type webpack from 'webpack';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   serverExternalPackages: [
     'sequelize',
     'tedious',
@@ -14,11 +12,10 @@ const nextConfig: NextConfig = {
     'strong-oracle',
   ],
   webpack: (
-    config: webpack.Configuration,
-    { isServer }: { isServer: boolean; dev: boolean; dir: string }
-  ): webpack.Configuration => {
+    config,
+    { isServer }
+  ) => {
     if (!isServer) {
-      // Ensure server-only modules are not bundled in the client
       config.resolve = {
         ...config.resolve,
         fallback: {
@@ -35,4 +32,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
