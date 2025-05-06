@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookmarkIcon, GitForkIcon, Share2Icon, CheckIcon } from "lucide-react";
 
@@ -24,7 +24,7 @@ const ThreadActions = ({ threadId, authorId, currentUserId }: ThreadActionsProps
 
     try {
       // Optimistic UI update
-      setIsBookmarked(prev => !prev);
+      setIsBookmarked((prev: boolean): boolean => !prev);
       
       const response = await fetch("/api/bookmarks", {
         method: "POST",

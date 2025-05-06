@@ -1,3 +1,5 @@
+'use server';
+
 import User from './User';
 import Thread from './Thread';
 import ThreadSegment from './ThreadSegment';

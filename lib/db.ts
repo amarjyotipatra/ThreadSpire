@@ -1,3 +1,5 @@
+'use server';
+
 import { Sequelize } from "sequelize";
 
 const sequelize = new Sequelize(

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Thread } from "../../../models";
 import { getCurrentUser } from "../../../lib/auth";
+import SortThreadsDropdown from "@/components/thread/SortThreadsDropdown";
 
 interface ExplorePageProps {
   searchParams: {
@@ -72,19 +73,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
         </div>
         
         <div className="flex items-center gap-2">
-          <select 
-            onChange={(e) => {
-              const url = new URL(window.location.href);
-              url.searchParams.set('sort', e.target.value);
-              window.location.href = url.toString();
-            }}
-            className="bg-background border rounded-md px-3 py-1.5"
-            defaultValue={sort}
-          >
-            <option value="popular">Most Bookmarked</option>
-            <option value="forked">Most Forked</option>
-            <option value="newest">Newest</option>
-          </select>
+          <SortThreadsDropdown currentSort={sort} currentTag={tag} />
         </div>
       </div>
       
