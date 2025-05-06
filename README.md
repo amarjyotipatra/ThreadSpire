@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ThreadSpire - Community Wisdom Threads
+
+ThreadSpire is a platform where users post reflective or helpful threads — not tweets or rants, but wisdom drops. Others can react, bookmark, or remix them into their own collections. It's social knowledge, not social media.
+
+## Features
+
+### 💭 Wisdom Threads
+
+- Create long-form structured threads with multiple segments
+- Add rich text formatting with TipTap editor
+- Add tags to categorize your wisdom
+- Save drafts or publish when ready
+
+### 👍 Reactions & Engagement
+
+- React to individual thread segments with 5 different emojis (🤯, 💡, 😌, 🔥, 🫶)
+- Bookmark threads to revisit later
+- Share threads with others
+
+### 🧠 Collections & Organization
+
+- Create personal collections of wisdom threads
+- Add/remove bookmarked threads to collections
+- Public or private collection visibility
+
+### 🔄 Remixing & Forking
+
+- Fork interesting threads to create your own version
+- Credit is given to the original thread author
+- Customize and expand on others' wisdom
+
+### 📊 Analytics Dashboard
+
+- Track engagement with your threads
+- See which segments resonate most with readers
+- Monitor bookmarks, reactions, and forks over time
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TailwindCSS
+- **Backend**: Next.js API Routes
+- **Database**: Sequelize ORM with SQL Server
+- **Authentication**: Clerk Authentication
+- **UI**: Custom components with dark mode support
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20+
+- SQL Server database
+- Clerk account for authentication
+
+### Environment Variables
+
+Create a `.env.local` file with the following variables:
+
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+DATABASE_URL=your_database_connection_string
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+### Installation
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/yourusername/threadspire.git
+cd threadspire
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Initialize the database:
+
+```bash
+npm run db:init
+```
+
+4. Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment on Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project is optimized for deployment on Vercel:
 
-## Learn More
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy!
 
-To learn more about Next.js, take a look at the following resources:
+### Important Deployment Notes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Ensure your SQL Server database is accessible from Vercel's servers
+- Configure Clerk to use the production domain for redirects
+- Set `NEXT_PUBLIC_APP_URL` to your production URL
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+- `/src/app` - Next.js App Router pages and API routes
+- `/src/components` - React components
+- `/models` - Sequelize database models
+- `/lib` - Utility functions and configuration
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT](https://choosealicense.com/licenses/mit/)
