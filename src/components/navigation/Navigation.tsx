@@ -1,10 +1,9 @@
 "use client";
 
-import React from 'react'; 
-import { UserButton, ClerkLoaded, useAuth, SignInButton } from "@clerk/nextjs";
-import { Home, AddBox, Search, FavoriteBorder, Person } from "@mui/icons-material";
+import React, { useState, useEffect } from 'react'; 
+import { Home, AddBox, Search, FavoriteBorder, Person, ExitToApp } from "@mui/icons-material";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   BottomNavigation,
   BottomNavigationAction,
@@ -13,7 +12,6 @@ import {
   AppBar,
   Toolbar,
   Typography,
-  IconButton,
   Avatar,
   useMediaQuery,
   useTheme,
@@ -23,20 +21,67 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider
+  Divider,
+  Button
 } from "@mui/material";
 import { ThemeToggle } from "../ui/ThemeToggle";
-import { useState } from "react";
+
+// Custom type for user data
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  profileImage?: string;
+}
 
 const Navigation = () => {
   const pathname = usePathname();
   const theme = useTheme();
+  const router = useRouter();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { isSignedIn } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch user data on client side
+  useEffect(() => {
+    async function fetchUserData() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const userData = await res.json();
+          setUser(userData.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchUserData();
+  }, [pathname]); // Re-fetch when path changes to keep auth state updated
   
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { 
+        method: 'POST' 
+      });
+      // Clear client-side user state
+      setUser(null);
+      // Redirect to home page
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
   };
   
   // Create base navigation items that are always visible
@@ -72,8 +117,8 @@ const Navigation = () => {
     },
   ];
   
-  // Combine base items with auth items if user is signed in
-  const navItems = isSignedIn 
+  // Combine base items with auth items if user is authenticated
+  const navItems = user 
     ? [...baseNavItems, ...authNavItems]
     : baseNavItems;
 
@@ -120,20 +165,37 @@ const Navigation = () => {
         </Box>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {isSignedIn ? (
+          {user ? (
             <>
-              <ClerkLoaded>
-                <UserButton afterSignOutUrl="/" />
-              </ClerkLoaded>
-              <Typography variant="body2">Account</Typography>
+              <Avatar 
+                sx={{ width: 32, height: 32 }}
+                src={user.profileImage} 
+                alt={user.name}
+              >
+                {user.name?.charAt(0)}
+              </Avatar>
+              <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                {user.name}
+              </Typography>
+              <Button 
+                startIcon={<ExitToApp />}
+                onClick={handleLogout}
+                size="small"
+                color="inherit"
+              >
+                Logout
+              </Button>
             </>
           ) : (
-            <SignInButton mode="modal">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
-                <Avatar sx={{ width: 32, height: 32 }} />
-                <Typography variant="body2">Account</Typography>
-              </Box>
-            </SignInButton>
+            <Button 
+              component={Link}
+              href="/sign-in"
+              variant="outlined"
+              size="small"
+              fullWidth
+            >
+              Sign In
+            </Button>
           )}
         </Box>
       </Box>
@@ -223,4 +285,4 @@ const Navigation = () => {
   );
 };
 
-export default React.memo(Navigation); // Wrapped Navigation with React.memo
+export default React.memo(Navigation);

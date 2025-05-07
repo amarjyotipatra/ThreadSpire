@@ -1,4 +1,3 @@
-import { ClerkProvider } from '@clerk/nextjs';
 import { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -21,34 +20,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider
-      publishableKey={process.env.CLERK_PUBLISHABLE_KEY}
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
-      afterSignInUrl="/"
-      afterSignUpUrl="/"
-    >
-      <html lang="en">
-        <body className={inter.className}>
-          <MuiThemeProvider defaultTheme="system">
-            <Navigation />
-            <Box
-              component="main"
-              sx={{
-                flexGrow: 1,
-                overflowY: 'auto',
-                paddingBottom: '56px',
-                paddingTop: '56px',
-                marginLeft: { xs: 0, sm: '240px' }
-              }}
-            >
-              <ErrorBoundary>
-                {children}
-              </ErrorBoundary>
-            </Box>
-          </MuiThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body className={inter.className}>
+        <MuiThemeProvider defaultTheme="system">
+          <Navigation />
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              overflowY: 'auto',
+              paddingBottom: '56px',
+              paddingTop: '56px',
+              marginLeft: { xs: 0, sm: '240px' }
+            }}
+          >
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
+          </Box>
+        </MuiThemeProvider>
+      </body>
+    </html>
   );
 }

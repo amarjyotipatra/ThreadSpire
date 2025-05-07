@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import { 
   Box, 
   Typography, 
@@ -39,10 +38,17 @@ interface Thread {
   createdAt: string;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  profileImage?: string;
+}
+
 export default function Home() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { isSignedIn } = useUser();
+  const [user, setUser] = useState<User | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -62,6 +68,26 @@ export default function Home() {
     }
 
     fetchThreads();
+  }, []);
+
+  // Fetch user data
+  useEffect(() => {
+    async function fetchUserData() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const userData = await res.json();
+          setUser(userData.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        setUser(null);
+      }
+    }
+    
+    fetchUserData();
   }, []);
   
   // Format date in Threads app style (e.g., "2h" for 2 hours ago)
@@ -92,15 +118,18 @@ export default function Home() {
   if (isMobile) {
     return (
       <Box sx={{ pb: 7, pt: 7 }}>
-        <SignedOut>
+        {!user && (
           <Box sx={{ p: 2, textAlign: 'center', mb: 2 }}>
-            <SignInButton mode="modal">
-              <Button variant="outlined" color="primary">
-                Sign in
-              </Button>
-            </SignInButton>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              component={Link}
+              href="/sign-in"
+            >
+              Sign in
+            </Button>
           </Box>
-        </SignedOut>
+        )}
         
         {isLoading ? (
           // Skeleton loading state
@@ -125,7 +154,7 @@ export default function Home() {
             <Typography color="text.secondary">
               No threads available yet.
             </Typography>
-            <SignedIn>
+            {user && (
               <Button
                 component={Link}
                 href="/create"
@@ -133,7 +162,7 @@ export default function Home() {
               >
                 Create the first thread
               </Button>
-            </SignedIn>
+            )}
           </Box>
         ) : (
           // Thread list - Threads style
@@ -263,7 +292,7 @@ export default function Home() {
   // Desktop view - similar but with more width constraints
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <SignedOut>
+      {!user && (
         <Box sx={{ mb: 5, textAlign: 'center' }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Welcome to ThreadSpire
@@ -272,13 +301,17 @@ export default function Home() {
             A minimalist platform for sharing valuable threads.
           </Typography>
           
-          <SignInButton mode="modal">
-            <Button variant="contained" color="primary" size="large">
-              Sign in to create threads
-            </Button>
-          </SignInButton>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            size="large"
+            component={Link}
+            href="/sign-in"
+          >
+            Sign in to create threads
+          </Button>
         </Box>
-      </SignedOut>
+      )}
       
       {isLoading ? (
         // Skeleton loading state for desktop
@@ -305,7 +338,7 @@ export default function Home() {
           <Typography color="text.secondary" paragraph>
             No threads available yet.
           </Typography>
-          <SignedIn>
+          {user && (
             <Button
               component={Link}
               href="/create"
@@ -314,7 +347,7 @@ export default function Home() {
             >
               Create the first thread
             </Button>
-          </SignedIn>
+          )}
         </Card>
       ) : (
         // Thread list for desktop - similar layout but with cards

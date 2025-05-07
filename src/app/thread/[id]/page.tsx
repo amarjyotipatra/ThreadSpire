@@ -24,7 +24,6 @@ import {
   IosShare, 
   MoreHoriz
 } from '@mui/icons-material';
-import { useUser } from '@clerk/nextjs';
 import ReactionSection from '@/components/thread/ReactionSection';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
@@ -96,9 +95,12 @@ export default function ThreadPage() {
   const [thread, setThread] = useState<Thread | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [reactionStates, setReactionStates] = useState<Array<{userReaction: string | null, counts: Record<string, number>}>>([]);
-  const { error, setError, clearError } = useErrorHandler();
+  const { error, setError, clearError } = useErrorHandler() as {
+    error: { message: string; type?: ErrorType } | null;
+    setError: (message: string, type?: ErrorType) => void;
+    clearError: () => void;
+  };
   const { id } = useParams() as { id: string };
-  const { user, isSignedIn } = useUser();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
@@ -140,9 +142,8 @@ export default function ThreadPage() {
             counts[reaction.type] = (counts[reaction.type] || 0) + 1;
           });
           
-          const userReaction = user 
-            ? segment.reactions.find((r: Reaction) => r.userId === user.id)?.type || null 
-            : null;
+          // Set userReaction to null since we don't have user info here
+          const userReaction = null;
             
           return { userReaction, counts };
         });
@@ -157,9 +158,8 @@ export default function ThreadPage() {
         setIsLoading(false);
       }
     };
-    
     fetchThreadData();
-  }, [id, user, setError, clearError]);
+  }, [id, setError, clearError]);
   
   if (isLoading) {
     return <ThreadDetailSkeleton isMobile={isMobile} />;
@@ -299,16 +299,12 @@ export default function ThreadPage() {
               sx={{ mb: 3 }}
               dangerouslySetInnerHTML={{ __html: segment.content }}
             />
-            
-            {/* Replace the basic reaction buttons with ReactionSection component */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <ReactionSection
                   segmentId={segment.id}
                   reactionCounts={reactionState.counts}
                   userReaction={reactionState.userReaction}
-                  isAuthenticated={!!isSignedIn}
+                  isAuthenticated={false}
                 />
-              
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <IconButton size={isMobile ? "small" : "medium"}>
                   <ChatBubbleOutline />
@@ -320,7 +316,6 @@ export default function ThreadPage() {
                   <IosShare />
                 </IconButton>
               </Box>
-            </Box>
             
             {/* Reaction stats */}
             {totalLikes > 0 && (

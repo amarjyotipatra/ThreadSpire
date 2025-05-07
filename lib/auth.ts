@@ -1,51 +1,38 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
-import { User } from '../models';
+import { cookies } from 'next/headers';
+import User from '../models/User';
 
-// Get current user from Clerk and create/update in our database
-export async function getCurrentUser() {
-    const { userId } = await auth();
+/**
+ * Retrieves the currently authenticated user from the session cookie.
+ * Returns the user object (without password) if authenticated, otherwise null.
+ */
+export async function getCurrentUser(): Promise<Omit<User, 'password'> | null> {
+  const userId = cookies().get('auth_session')?.value;
 
-    if (!userId) {
-        return null;
+  if (!userId) {
+    return null;
+  }
+
+  try {
+    const user = await User.findByPk(userId);
+    
+    if (!user) {
+      return null;
     }
 
-    // Get user info from Clerk
-    const clerkUser = await currentUser();
-
-    if (!clerkUser) {
-        return null;
-    }
-
-    // Find or create user in our database
-    const [user] = await User.findOrCreate({
-        where: { id: userId },
-        defaults: {
-            id: userId,
-            email: clerkUser.emailAddresses[0]?.emailAddress || '',
-            name: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'User',
-            profileImage: clerkUser.imageUrl,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        },
-    });
-
-    // Update user info if it's changed
-    if (
-        user.email !== clerkUser.emailAddresses[0]?.emailAddress ||
-        user.name !== `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
-        user.profileImage !== clerkUser.imageUrl
-    ) {
-        user.email = clerkUser.emailAddresses[0]?.emailAddress || user.email;
-        user.name = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || user.name;
-        user.profileImage = clerkUser.imageUrl || user.profileImage;
-        user.updatedAt = new Date();
-        await user.save();
-    }
-
-    return user;
+    // Convert to plain object and remove password
+    const userObj = user.get({ plain: true });
+    const { password, ...userWithoutPassword } = userObj;
+    
+    return userWithoutPassword as Omit<User, 'password'>;
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
+  }
 }
 
-// Check if current user exists
+/**
+ * Check if current user exists
+ */
 export async function requireAuth() {
     const user = await getCurrentUser();
 

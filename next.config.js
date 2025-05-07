@@ -1,5 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Add environmental variables that should be accessible at build time
+  env: {
+    DATABASE_URL: process.env.DATABASE_URL,
+    DB_USER: process.env.DB_USER,
+    DB_PASSWORD: process.env.DB_PASSWORD,
+    DB_HOST: process.env.DB_HOST,
+    DB_PORT: process.env.DB_PORT
+  },
+  
   webpack: (
     config,
     { isServer, webpack }
@@ -62,9 +71,26 @@ const nextConfig = {
     
     return config;
   },
+  
   // Add this option to prevent server-only code from being included in client bundles
   experimental: {
     serverComponentsExternalPackages: ['tedious', 'sequelize']
+  },
+  
+  // Add proper handling for static page generation
+  output: 'standalone',
+  
+  // Increase timeout for long builds
+  staticPageGenerationTimeout: 180,
+  
+  // Set proper server-side configs for dynamic routes
+  serverRuntimeConfig: {
+    // Will only be available on the server side
+    DATABASE_URL: process.env.DATABASE_URL,
+  },
+  publicRuntimeConfig: {
+    // Will be available on both server and client
+    staticFolder: '/static',
   }
 };
 

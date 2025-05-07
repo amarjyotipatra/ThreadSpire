@@ -1,9 +1,10 @@
-import { Model, DataTypes } from 'sequelize';
+import { Model, DataTypes, UUIDV4 } from 'sequelize';
 import { sequelize } from '../lib/db';
 
 interface UserAttributes {
   id: string;
   email: string;
+  password: string; // Plain password field
   name: string;
   profileImage?: string;
   bio?: string;
@@ -14,6 +15,7 @@ interface UserAttributes {
 class User extends Model<UserAttributes> implements UserAttributes {
   public id!: string;
   public email!: string;
+  public password!: string;
   public name!: string;
   public profileImage!: string;
   public bio!: string;
@@ -24,7 +26,8 @@ class User extends Model<UserAttributes> implements UserAttributes {
 User.init(
   {
     id: {
-      type: DataTypes.STRING,
+      type: DataTypes.UUID, // Changed to UUID
+      defaultValue: UUIDV4, // Auto-generate UUIDs
       primaryKey: true,
       allowNull: false,
     },
@@ -32,6 +35,10 @@ User.init(
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
+    },
+    password: {
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     name: {
       type: DataTypes.STRING,
