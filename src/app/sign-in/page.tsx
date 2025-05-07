@@ -36,13 +36,20 @@ function SignInForm() {
     setIsLoading(true);
 
     try {
+      // Set a timeout for the fetch request to prevent UI hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId); // Clear the timeout since request completed
 
       const data = await response.json();
 
@@ -54,7 +61,15 @@ function SignInForm() {
       router.push(redirectUrl);
       router.refresh(); // Refresh the page to update authentication state
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('Sign-in request timed out. Please try again.');
+        } else {
+          setError(err.message || 'An unexpected error occurred');
+        }
+      } else {
+        setError('An unexpected error occurred');
+      }
     } finally {
       setIsLoading(false);
     }

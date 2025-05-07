@@ -27,25 +27,54 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
+      // Set a timeout for the fetch request to prevent UI hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ name, email, password }),
+        signal: controller.signal
       });
 
-      const data = await response.json();
+      clearTimeout(timeoutId); // Clear the timeout since request completed
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to sign up');
+      // Try to parse the response as JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        throw new Error('Server returned an invalid response. Please try again.');
       }
 
-      // Redirect to the homepage after successful registration
-      router.push('/');
-      router.refresh(); // Refresh the page to update authentication state
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Failed to sign up');
+      }
+
+      // Registration successful - show success message briefly before redirecting
+      setError(null);
+      
+      // Redirect to the sign-in page after successful registration with a small delay
+      setTimeout(() => {
+        router.push('/sign-in');
+        router.refresh(); // Refresh the page to update authentication state
+      }, 1000);
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('Registration request timed out. Please try again.');
+        } else {
+          setError(err.message || 'An unexpected error occurred');
+        }
+      } else {
+        setError('An unexpected error occurred');
+      }
+      console.error('Registration error:', err);
     } finally {
       setIsLoading(false);
     }

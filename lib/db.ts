@@ -1,4 +1,15 @@
 import { Sequelize } from 'sequelize';
+import path from 'path';
+import fs from 'fs';
+
+// Create a data directory for SQLite if it doesn't exist
+const dataDir = path.join(process.cwd(), 'data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+// SQLite database path for local development
+const sqlitePath = path.join(dataDir, 'threadspire.sqlite');
 
 // Better build time detection with multiple checks
 export const isBuildTime = 
@@ -8,31 +19,72 @@ export const isBuildTime =
 
 const databaseUrl = process.env.DATABASE_URL;
 
-// Initialize a mock database for build time or use the real connection
+// Initialize database connection
 let sequelize: Sequelize;
 
-// Always use mock database during build to avoid connection errors
-if (isBuildTime || !databaseUrl) {
-  // Create a mock Sequelize instance for build time
-  sequelize = new Sequelize('sqlite::memory:', {
+console.log('Database initialization starting');
+
+// Always use SQLite for development to ensure it works
+if (process.env.NODE_ENV !== 'production' || isBuildTime || !databaseUrl) {
+  console.log('Using SQLite database for development/build');
+  
+  // Create a SQLite database for development
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: isBuildTime ? ':memory:' : sqlitePath,
     logging: false
   });
 } else {
-  // Runtime with available database URL
-  // Initialize production database connection without dynamic imports
-  sequelize = new Sequelize(databaseUrl, {
-    dialect: 'mssql',
-    dialectOptions: {
-      encrypt: true,  // Required for Azure SQL Database
-      trustServerCertificate: false,
-    },
-    logging: false,  // Disable logging for cleaner output
+  // Production environment with database URL
+  try {
+    console.log('Attempting to connect to production database');
+    
+    sequelize = new Sequelize(databaseUrl, {
+      dialect: 'mssql',
+      dialectOptions: {
+        encrypt: true,
+        trustServerCertificate: false,
+        options: {
+          requestTimeout: 5000,
+          connectTimeout: 5000
+        }
+      },
+      logging: false,
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 10000,
+        idle: 10000
+      }
+    });
+  } catch (err) {
+    console.error('Failed to initialize production database, falling back to SQLite:', err);
+    
+    sequelize = new Sequelize({
+      dialect: 'sqlite',
+      storage: sqlitePath,
+      logging: false
+    });
+  }
+}
+
+// Initialize database tables on startup
+// Don't await this to avoid blocking the app startup
+sequelize.sync({ alter: process.env.NODE_ENV !== 'production' })
+  .then(() => {
+    console.log('Database tables synchronized successfully');
+  })
+  .catch((err) => {
+    console.error('Failed to sync database tables:', err);
   });
 
-  // Only authenticate at runtime but don't await at the top level
-  sequelize.authenticate()
-    .then(() => console.log('Connected to Azure SQL Database'))
-    .catch((err) => console.error('Connection error:', err.message || err));
-}
+// Test the connection
+sequelize.authenticate()
+  .then(() => {
+    console.log('Database connection established successfully');
+  })
+  .catch((err) => {
+    console.error('Failed to connect to database:', err);
+  });
 
 export { sequelize };
