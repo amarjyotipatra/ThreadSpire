@@ -39,7 +39,8 @@ const Navigation = () => {
     setMobileOpen(!mobileOpen);
   };
   
-  const navItems = [
+  // Create base navigation items that are always visible
+  const baseNavItems = [
     {
       label: "Home",
       href: "/",
@@ -55,6 +56,10 @@ const Navigation = () => {
       href: "/create",
       icon: AddBox,
     },
+  ];
+  
+  // Add authenticated-only items
+  const authNavItems = [
     {
       label: "Bookmarks",
       href: "/bookmarks",
@@ -66,6 +71,11 @@ const Navigation = () => {
       icon: Person,
     },
   ];
+  
+  // Combine base items with auth items if user is signed in
+  const navItems = isSignedIn 
+    ? [...baseNavItems, ...authNavItems]
+    : baseNavItems;
 
   // Find active nav item index for bottom navigation
   const activeNavIndex = navItems.findIndex(item => item.href === pathname) !== -1 
